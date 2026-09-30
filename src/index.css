@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    margin: 0;
+    padding: 0;
+    background-color: #0b1329;
+    color: #f1f5f9;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 58mm Receipt standard: ~48mm-54mm printable (~220px) */
+.ticket-58mm {
+  width: 54mm;
+  max-width: 220px;
+  font-family: 'Courier New', Courier, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #000000 !important;
+  background-color: #ffffff;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* 80mm Receipt standard: ~72mm-76mm printable (~310px) */
+.ticket-80mm {
+  width: 76mm;
+  max-width: 320px;
+  font-family: 'Courier New', Courier, Consolas, monospace;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #000000 !important;
+  background-color: #ffffff;
+  padding: 12px 10px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Robust Thermal Printer CSS Media Print Rules */
+@media print {
+  @page {
+    margin: 0mm;
+    size: auto;
+  }
+
+  html, body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    font-weight: 700 !important;
+  }
+
+  /* Hide app navigation and headers */
+  header, aside, main, nav, .no-print {
+    display: none !important;
+  }
+
+  /* Reset modal containers so they never produce dark boxes or clipping */
+  .fixed, [class*="fixed"] {
+    position: static !important;
+    background-color: transparent !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide modal headers and action buttons */
+  .fixed > div > div:first-child,
+  .fixed > div > div:last-child,
+  .fixed button {
+    display: none !important;
+  }
+
+  /* Display ticket in clean center of roll */
+  #printable-ticket {
+    display: block !important;
+    visibility: visible !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 4px 6px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  #printable-ticket * {
+    visibility: visible !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .hidden, [hidden], #printable-ticket .hidden, #printable-ticket [hidden] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
