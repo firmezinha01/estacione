@@ -1,8 +1,13 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Read from Vite environment or localStorage override
-const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Default credentials for user project (can be overridden via .env or UI modal)
+const DEFAULT_SUPABASE_URL = 'https://dewcpxfdszbmgrwnjegn.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRld2NweGZkc3pibWdyd25qZWduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4MDMxODcsImV4cCI6MjEwNjM3OTE4N30.XnYrNjYJrdBaDQkawc8waVgpMxLyV9SOp0kbyE7nhnk';
+
+// Read from Vite environment, localStorage override, or default project
+const envUrl = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
 const storedConfig = (() => {
   try {
