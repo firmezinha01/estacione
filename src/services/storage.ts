@@ -8,7 +8,18 @@ import {
   User,
   Vehicle,
 } from '../types/parking';
-import { extractTicketCode } from '../utils/formatters';
+import { extractTicketCode, generateUUID } from '../utils/formatters';
+import {
+  fetchAllFromSupabase,
+  pushCustomerToSupabase,
+  deleteCustomerFromSupabase,
+  pushVehicleToSupabase,
+  pushEntryToSupabase,
+  pushCheckoutToSupabase,
+  pushCancelEntryToSupabase,
+  pushSettingsToSupabase,
+  pushAuditLogToSupabase,
+} from './supabaseSync';
 
 const STORAGE_KEYS = {
   USERS: 'estacionamento_users',
@@ -24,7 +35,7 @@ const STORAGE_KEYS = {
   SUPABASE_CONFIG: 'estacionamento_supabase_config',
 };
 
-// Initial Seed Settings
+// Initial Seed Settings (Standard UUID)
 export const initialSettings: Settings = {
   id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   nome_estabelecimento: 'EstacioneFácil Prime',
@@ -45,7 +56,7 @@ export const initialSettings: Settings = {
   lgpd_termo: 'Seus dados são protegidos nos termos da LGPD e utilizados estritamente para segurança e faturamento do serviço.',
 };
 
-// Initial Seed Users
+// Initial Seed Users (Standard UUIDs)
 export const initialUsers: User[] = [
   {
     id: 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22',
@@ -65,10 +76,10 @@ export const initialUsers: User[] = [
   },
 ];
 
-// Initial Seed Customers
+// Initial Seed Customers (Standard UUIDs)
 export const initialCustomers: Customer[] = [
   {
-    id: 'cust-1',
+    id: 'd1111111-1111-4111-8111-111111111111',
     nome: 'Roberto Silveira',
     telefone: '(11) 99123-8877',
     cpf: '123.456.789-00',
@@ -82,7 +93,7 @@ export const initialCustomers: Customer[] = [
     created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
   },
   {
-    id: 'cust-2',
+    id: 'd2222222-2222-4222-8222-222222222222',
     nome: 'Mariana Duarte',
     telefone: '(11) 98765-1122',
     cpf: '234.567.890-11',
@@ -96,7 +107,7 @@ export const initialCustomers: Customer[] = [
     created_at: new Date(Date.now() - 40 * 86400000).toISOString(),
   },
   {
-    id: 'cust-3',
+    id: 'd3333333-3333-4333-8333-333333333333',
     nome: 'Lucas Mendes',
     telefone: '(11) 97654-3210',
     tipo: 'avulso',
@@ -106,37 +117,37 @@ export const initialCustomers: Customer[] = [
   },
 ];
 
-// Initial Seed Vehicles
+// Initial Seed Vehicles (Standard UUIDs)
 export const initialVehicles: Vehicle[] = [
   {
-    id: 'veh-1',
+    id: 'e1111111-1111-4111-8111-111111111111',
     placa: 'BRA2E19',
     modelo: 'Toyota Corolla Cross',
     cor: 'Prata',
     tipo: 'carro',
-    cliente_id: 'cust-1',
+    cliente_id: 'd1111111-1111-4111-8111-111111111111',
     created_at: new Date(Date.now() - 50 * 86400000).toISOString(),
   },
   {
-    id: 'veh-2',
+    id: 'e2222222-2222-4222-8222-222222222222',
     placa: 'MTO5K22',
     modelo: 'Honda CB 500X',
     cor: 'Vermelha',
     tipo: 'moto',
-    cliente_id: 'cust-2',
+    cliente_id: 'd2222222-2222-4222-8222-222222222222',
     created_at: new Date(Date.now() - 40 * 86400000).toISOString(),
   },
   {
-    id: 'veh-3',
+    id: 'e3333333-3333-4333-8333-333333333333',
     placa: 'ABC4D56',
     modelo: 'Jeep Compass Longitude',
     cor: 'Preto',
     tipo: 'carro',
-    cliente_id: 'cust-3',
+    cliente_id: 'd3333333-3333-4333-8333-333333333333',
     created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
   },
   {
-    id: 'veh-4',
+    id: 'e4444444-4444-4444-8444-444444444444',
     placa: 'HIL7X89',
     modelo: 'Toyota Hilux SRX',
     cor: 'Branca',
@@ -144,7 +155,7 @@ export const initialVehicles: Vehicle[] = [
     created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
   {
-    id: 'veh-5',
+    id: 'e5555555-5555-4555-8555-555555555555',
     placa: 'ONX9Y12',
     modelo: 'Chevrolet Onix Turbo',
     cor: 'Azul',
@@ -153,14 +164,13 @@ export const initialVehicles: Vehicle[] = [
   },
 ];
 
-// Initial Seed Entries (active and historical completed)
+// Initial Seed Entries (Standard UUIDs)
 const now = Date.now();
 export const initialEntries: Entry[] = [
-  // Active parked 1: Corolla (Mensalista)
   {
-    id: 'ent-1',
-    vehicle_id: 'veh-1',
-    horario_entrada: new Date(now - 3 * 3600000 - 15 * 60000).toISOString(), // ~3h15m ago
+    id: 'f1111111-1111-4111-8111-111111111111',
+    vehicle_id: 'e1111111-1111-4111-8111-111111111111',
+    horario_entrada: new Date(now - 3 * 3600000 - 15 * 60000).toISOString(),
     tempo_minutos: 195,
     tarifa_calculada: 0,
     valor_desconto: 0,
@@ -170,11 +180,10 @@ export const initialEntries: Entry[] = [
     observacoes: 'Entrada mensalista',
     created_at: new Date(now - 3 * 3600000).toISOString(),
   },
-  // Active parked 2: Hilux (Camionete - avulso)
   {
-    id: 'ent-2',
-    vehicle_id: 'veh-4',
-    horario_entrada: new Date(now - 1 * 3600000 - 45 * 60000).toISOString(), // ~1h45m ago
+    id: 'f2222222-2222-4222-8222-222222222222',
+    vehicle_id: 'e4444444-4444-4444-8444-444444444444',
+    horario_entrada: new Date(now - 1 * 3600000 - 45 * 60000).toISOString(),
     tempo_minutos: 105,
     tarifa_calculada: 22.50,
     valor_desconto: 0,
@@ -184,11 +193,10 @@ export const initialEntries: Entry[] = [
     observacoes: 'Vaga grande',
     created_at: new Date(now - 105 * 60000).toISOString(),
   },
-  // Active parked 3: Onix (Carro - avulso)
   {
-    id: 'ent-3',
-    vehicle_id: 'veh-5',
-    horario_entrada: new Date(now - 35 * 60000).toISOString(), // ~35 min ago
+    id: 'f3333333-3333-4333-8333-333333333333',
+    vehicle_id: 'e5555555-5555-4555-8555-555555555555',
+    horario_entrada: new Date(now - 35 * 60000).toISOString(),
     tempo_minutos: 35,
     tarifa_calculada: 12.00,
     valor_desconto: 0,
@@ -197,10 +205,9 @@ export const initialEntries: Entry[] = [
     status: 'ativo',
     created_at: new Date(now - 35 * 60000).toISOString(),
   },
-  // Completed today 1
   {
-    id: 'ent-4',
-    vehicle_id: 'veh-3',
+    id: 'f4444444-4444-4444-8444-444444444444',
+    vehicle_id: 'e3333333-3333-4333-8333-333333333333',
     horario_entrada: new Date(now - 5 * 3600000).toISOString(),
     horario_saida: new Date(now - 2 * 3600000).toISOString(),
     tempo_minutos: 180,
@@ -211,10 +218,9 @@ export const initialEntries: Entry[] = [
     status: 'pago',
     created_at: new Date(now - 5 * 3600000).toISOString(),
   },
-  // Completed today 2
   {
-    id: 'ent-5',
-    vehicle_id: 'veh-2',
+    id: 'f5555555-5555-4555-8555-555555555555',
+    vehicle_id: 'e2222222-2222-4222-8222-222222222222',
     horario_entrada: new Date(now - 6 * 3600000).toISOString(),
     horario_saida: new Date(now - 4 * 3600000).toISOString(),
     tempo_minutos: 120,
@@ -227,11 +233,11 @@ export const initialEntries: Entry[] = [
   },
 ];
 
-// Initial Seed Labels (with unique anti-replay codes)
+// Initial Seed Labels (Standard UUIDs)
 export const initialLabels: Label[] = [
   {
-    id: 'lbl-1',
-    entry_id: 'ent-1',
+    id: 'a1111111-1111-4111-8111-111111111111',
+    entry_id: 'f1111111-1111-4111-8111-111111111111',
     codigo_unico: 'EST-9A2K41',
     qrcode: 'EST-9A2K41',
     impressora: '80mm',
@@ -239,8 +245,8 @@ export const initialLabels: Label[] = [
     impresso_em: new Date(now - 3 * 3600000).toISOString(),
   },
   {
-    id: 'lbl-2',
-    entry_id: 'ent-2',
+    id: 'a2222222-2222-4222-8222-222222222222',
+    entry_id: 'f2222222-2222-4222-8222-222222222222',
     codigo_unico: 'EST-8B7C52',
     qrcode: 'EST-8B7C52',
     impressora: '80mm',
@@ -248,8 +254,8 @@ export const initialLabels: Label[] = [
     impresso_em: new Date(now - 105 * 60000).toISOString(),
   },
   {
-    id: 'lbl-3',
-    entry_id: 'ent-3',
+    id: 'a3333333-3333-4333-8333-333333333333',
+    entry_id: 'f3333333-3333-4333-8333-333333333333',
     codigo_unico: 'EST-4X1M99',
     qrcode: 'EST-4X1M99',
     impressora: '58mm',
@@ -257,8 +263,8 @@ export const initialLabels: Label[] = [
     impresso_em: new Date(now - 35 * 60000).toISOString(),
   },
   {
-    id: 'lbl-4',
-    entry_id: 'ent-4',
+    id: 'a4444444-4444-4444-8444-444444444444',
+    entry_id: 'f4444444-4444-4444-8444-444444444444',
     codigo_unico: 'EST-7J3H12',
     qrcode: 'EST-7J3H12',
     impressora: '80mm',
@@ -267,8 +273,8 @@ export const initialLabels: Label[] = [
     utilizado_em: new Date(now - 2 * 3600000).toISOString(),
   },
   {
-    id: 'lbl-5',
-    entry_id: 'ent-5',
+    id: 'a5555555-5555-4555-8555-555555555555',
+    entry_id: 'f5555555-5555-4555-8555-555555555555',
     codigo_unico: 'EST-6K9P84',
     qrcode: 'EST-6K9P84',
     impressora: '80mm',
@@ -278,11 +284,11 @@ export const initialLabels: Label[] = [
   },
 ];
 
-// Initial Seed Payments
+// Initial Seed Payments (Standard UUIDs)
 export const initialPayments: Payment[] = [
   {
-    id: 'pay-1',
-    entry_id: 'ent-4',
+    id: 'b1111111-1111-4111-8111-111111111111',
+    entry_id: 'f4444444-4444-4444-8444-444444444444',
     valor: 24.00,
     metodo: 'pix',
     status: 'pago',
@@ -291,8 +297,8 @@ export const initialPayments: Payment[] = [
     created_at: new Date(now - 2 * 3600000).toISOString(),
   },
   {
-    id: 'pay-2',
-    entry_id: 'ent-5',
+    id: 'b2222222-2222-4222-8222-222222222222',
+    entry_id: 'f5555555-5555-4555-8555-555555555555',
     valor: 0.00,
     metodo: 'faturado',
     status: 'pago',
@@ -302,28 +308,21 @@ export const initialPayments: Payment[] = [
   },
 ];
 
-// Initial Audit Logs
+// Initial Audit Logs (Standard UUIDs)
 export const initialAuditLogs: AuditLog[] = [
   {
-    id: 'log-1',
+    id: 'c1111111-1111-4111-8111-111111111111',
     usuario_nome: 'Sistema',
     acao: 'INICIALIZACAO_SISTEMA',
-    detalhes: { versao: '1.0.0', status: 'banco de dados inicializado com sucesso' },
+    detalhes: { versao: '1.0.0', status: 'banco de dados conectado' },
     data_hora: new Date(now - 24 * 3600000).toISOString(),
   },
   {
-    id: 'log-2',
+    id: 'c2222222-2222-4222-8222-222222222222',
     usuario_nome: 'Carlos Atendente',
     acao: 'ENTRADA_VEICULO',
     detalhes: { placa: 'HIL7X89', ticket: 'EST-8B7C52' },
     data_hora: new Date(now - 105 * 60000).toISOString(),
-  },
-  {
-    id: 'log-3',
-    usuario_nome: 'Carlos Atendente',
-    acao: 'BAIXA_SAIDA',
-    detalhes: { placa: 'ABC4D56', ticket: 'EST-7J3H12', valor: 24.00, metodo: 'pix' },
-    data_hora: new Date(now - 2 * 3600000).toISOString(),
   },
 ];
 
@@ -394,6 +393,51 @@ class StorageService {
     }
   }
 
+  /**
+   * Synchronize all data from Supabase PostgreSQL cloud database into local storage
+   */
+  async syncFromSupabase(): Promise<boolean> {
+    const data = await fetchAllFromSupabase();
+    if (!data) return false;
+
+    let updated = false;
+
+    if (data.settings) {
+      this.setItem(STORAGE_KEYS.SETTINGS, data.settings);
+      updated = true;
+    }
+    if (data.customers && data.customers.length > 0) {
+      this.setItem(STORAGE_KEYS.CUSTOMERS, data.customers);
+      updated = true;
+    }
+    if (data.vehicles && data.vehicles.length > 0) {
+      this.setItem(STORAGE_KEYS.VEHICLES, data.vehicles);
+      updated = true;
+    }
+    if (data.entries && data.entries.length > 0) {
+      this.setItem(STORAGE_KEYS.ENTRIES, data.entries);
+      updated = true;
+    }
+    if (data.labels && data.labels.length > 0) {
+      this.setItem(STORAGE_KEYS.LABELS, data.labels);
+      updated = true;
+    }
+    if (data.payments && data.payments.length > 0) {
+      this.setItem(STORAGE_KEYS.PAYMENTS, data.payments);
+      updated = true;
+    }
+    if (data.auditLogs && data.auditLogs.length > 0) {
+      this.setItem(STORAGE_KEYS.AUDIT_LOGS, data.auditLogs);
+      updated = true;
+    }
+    if (data.users && data.users.length > 0) {
+      this.setItem(STORAGE_KEYS.USERS, data.users);
+      updated = true;
+    }
+
+    return updated;
+  }
+
   // Settings
   getSettings(): Settings {
     return this.getItem<Settings>(STORAGE_KEYS.SETTINGS, initialSettings);
@@ -401,6 +445,7 @@ class StorageService {
 
   saveSettings(settings: Settings): void {
     this.setItem(STORAGE_KEYS.SETTINGS, settings);
+    pushSettingsToSupabase(settings).catch(() => {});
     this.addAuditLog('ATUALIZACAO_CONFIGURACOES', {
       tarifa_hora: settings.tarifa_hora,
       tarifa_diaria: settings.tarifa_diaria,
@@ -426,7 +471,7 @@ class StorageService {
   }
 
   getAuthSession(): boolean {
-    if (!this.isLocalStorageAvailable()) return true; // Default in testing environments
+    if (!this.isLocalStorageAvailable()) return true;
     return localStorage.getItem(STORAGE_KEYS.AUTH_SESSION) === 'true';
   }
 
@@ -447,6 +492,9 @@ class StorageService {
 
   saveCustomer(customer: Customer): Customer {
     const list = this.getCustomers();
+    if (!customer.id) {
+      customer.id = generateUUID();
+    }
     const idx = list.findIndex(c => c.id === customer.id);
     if (idx >= 0) {
       list[idx] = customer;
@@ -454,12 +502,14 @@ class StorageService {
       list.push(customer);
     }
     this.setItem(STORAGE_KEYS.CUSTOMERS, list);
+    pushCustomerToSupabase(customer).catch(() => {});
     return customer;
   }
 
   deleteCustomer(id: string): void {
     const list = this.getCustomers().filter(c => c.id !== id);
     this.setItem(STORAGE_KEYS.CUSTOMERS, list);
+    deleteCustomerFromSupabase(id).catch(() => {});
     this.addAuditLog('EXCLUSAO_CLIENTE_LGPD', { id });
   }
 
@@ -481,6 +531,9 @@ class StorageService {
 
   saveVehicle(vehicle: Vehicle): Vehicle {
     const list = this.getItem<Vehicle[]>(STORAGE_KEYS.VEHICLES, initialVehicles);
+    if (!vehicle.id) {
+      vehicle.id = generateUUID();
+    }
     const cleanPlate = vehicle.placa.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const idx = list.findIndex(v => v.placa.toUpperCase().replace(/[^A-Z0-9]/g, '') === cleanPlate);
     if (idx >= 0) {
@@ -489,6 +542,7 @@ class StorageService {
       list.push(vehicle);
     }
     this.setItem(STORAGE_KEYS.VEHICLES, list);
+    pushVehicleToSupabase(vehicle).catch(() => {});
     return vehicle;
   }
 
@@ -569,7 +623,7 @@ class StorageService {
         clienteId = customer.id;
       } else {
         customer = this.saveCustomer({
-          id: `cust-${Date.now()}`,
+          id: generateUUID(),
           nome: vehicleData.cliente_nome?.trim() || 'Cliente Avulso',
           telefone: vehicleData.cliente_telefone?.trim() || '',
           tipo: 'avulso',
@@ -587,7 +641,7 @@ class StorageService {
     let vehicle = this.findVehicleByPlate(vehicleData.placa);
     if (!vehicle) {
       vehicle = {
-        id: `veh-${Date.now()}`,
+        id: generateUUID(),
         placa: vehicleData.placa.toUpperCase().trim(),
         modelo: vehicleData.modelo.trim(),
         cor: vehicleData.cor.trim(),
@@ -613,8 +667,8 @@ class StorageService {
     const isPrepaid = isDiaria && Boolean(diariaOptions.pago_na_entrada);
     const fixedRate = isDiaria ? Number(diariaOptions.valor_diaria_fixa) : 0;
 
-    // 3. Create entry record
-    const entryId = `ent-${Date.now()}`;
+    // 3. Create entry record with standard UUID
+    const entryId = generateUUID();
     const newEntry: Entry = {
       id: entryId,
       vehicle_id: vehicle.id,
@@ -641,7 +695,7 @@ class StorageService {
     const ticketCode = `EST-${codePart}`;
 
     const newLabel: Label = {
-      id: `lbl-${Date.now()}`,
+      id: generateUUID(),
       entry_id: entryId,
       codigo_unico: ticketCode,
       qrcode: ticketCode,
@@ -654,7 +708,7 @@ class StorageService {
     let initialPayment: Payment | undefined;
     if (isPrepaid) {
       initialPayment = {
-        id: `pay-${Date.now()}`,
+        id: generateUUID(),
         entry_id: entryId,
         valor: fixedRate,
         metodo: diariaOptions.metodo_pagamento_entrada || 'pix',
@@ -669,7 +723,7 @@ class StorageService {
       newEntry.payment = initialPayment;
     }
 
-    // Save entry and label
+    // Save entry and label to local cache
     const entries = this.getItem<Entry[]>(STORAGE_KEYS.ENTRIES, initialEntries);
     entries.unshift(newEntry);
     this.setItem(STORAGE_KEYS.ENTRIES, entries);
@@ -677,6 +731,11 @@ class StorageService {
     const labels = this.getItem<Label[]>(STORAGE_KEYS.LABELS, initialLabels);
     labels.unshift(newLabel);
     this.setItem(STORAGE_KEYS.LABELS, labels);
+
+    // Live persistence to Supabase PostgreSQL database
+    pushEntryToSupabase(newEntry, newLabel, initialPayment, customer, vehicle).catch(err => {
+      console.warn('Erro salvando no Supabase em segundo plano:', err);
+    });
 
     this.addAuditLog(
       isPrepaid
@@ -708,9 +767,6 @@ class StorageService {
     };
   }
 
-  /**
-   * Process checkout with single-use validation (anti-replay QR code security)
-   */
   processCheckout(
     entryId: string,
     paymentMethod: Payment['metodo'],
@@ -718,20 +774,15 @@ class StorageService {
     desconto: number = 0,
     acrescimo: number = 0
   ): { success: boolean; message: string; entry?: Entry } {
-    const entries = this.getEntries();
-    const entryIndex = entries.findIndex(e => e.id === entryId);
-
-    if (entryIndex === -1) {
-      return { success: false, message: 'Ticket ou estadia não encontrada no sistema.' };
+    const currentEntry = this.getEntries().find(e => e.id === entryId);
+    if (!currentEntry) {
+      return { success: false, message: 'Ticket/Entrada não localizada no sistema.' };
     }
 
-    const currentEntry = entries[entryIndex];
-
-    // Single-use validation check
     if (currentEntry.status === 'pago') {
       return {
         success: false,
-        message: 'Atenção: Este QR Code já foi utilizado e a saída já foi liberada anteriormente!',
+        message: 'Este ticket já foi utilizado e baixado anteriormente.',
       };
     }
 
@@ -750,9 +801,9 @@ class StorageService {
     let existingPayment = currentEntry.payment;
     let paymentToSave = existingPayment;
 
-    // Only create a new payment if not already prepaid or if there is an additional amount
+    // Create a new payment if not already prepaid or if there is a remaining amount
     if (!currentEntry.pago_na_entrada || valorFinal > 0) {
-      const paymentId = `pay-${Date.now()}`;
+      const paymentId = generateUUID();
       paymentToSave = {
         id: paymentId,
         entry_id: entryId,
@@ -804,6 +855,15 @@ class StorageService {
       label: labelIdx >= 0 ? labels[labelIdx] : undefined,
     };
 
+    // Live persistence to Supabase
+    if (paymentToSave) {
+      pushCheckoutToSupabase(
+        updatedEntry,
+        paymentToSave,
+        labelIdx >= 0 ? labels[labelIdx] : undefined
+      ).catch(() => {});
+    }
+
     this.addAuditLog('BAIXA_SAIDA_SUCESSO', {
       entryId,
       placa: updatedEntry.vehicle?.placa,
@@ -827,6 +887,8 @@ class StorageService {
     raw[idx].status = 'cancelado';
     raw[idx].observacoes = `${raw[idx].observacoes ? raw[idx].observacoes + ' | ' : ''}Cancelado: ${motivo}`;
     this.setItem(STORAGE_KEYS.ENTRIES, raw);
+
+    pushCancelEntryToSupabase(entryId, motivo).catch(() => {});
     this.addAuditLog('CANCELAMENTO_TICKET', { entryId, motivo });
     return true;
   }
@@ -839,7 +901,7 @@ class StorageService {
   addAuditLog(acao: string, detalhes?: Record<string, any>): void {
     const user = this.getCurrentUser();
     const log: AuditLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      id: generateUUID(),
       usuario_id: user?.id,
       usuario_nome: user?.nome || 'Sistema',
       acao,
@@ -849,9 +911,10 @@ class StorageService {
     };
     const logs = this.getItem<AuditLog[]>(STORAGE_KEYS.AUDIT_LOGS, initialAuditLogs);
     logs.unshift(log);
-    // Limit to latest 500 logs
     if (logs.length > 500) logs.length = 500;
     this.setItem(STORAGE_KEYS.AUDIT_LOGS, logs);
+
+    pushAuditLogToSupabase(log).catch(() => {});
   }
 
   // Reset to default sample data

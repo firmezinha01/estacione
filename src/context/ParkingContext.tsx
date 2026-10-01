@@ -82,6 +82,12 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
   useEffect(() => {
     storage.init();
     refreshData();
+    // Synchronize live cloud data from Supabase PostgreSQL
+    storage.syncFromSupabase().then(hasUpdates => {
+      if (hasUpdates) {
+        refreshData();
+      }
+    });
   }, []);
 
   const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {

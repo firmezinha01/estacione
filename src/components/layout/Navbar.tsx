@@ -4,26 +4,22 @@ import {
   Clock,
   Shield,
   UserCheck,
-  Database,
   Smartphone,
   ShieldAlert,
   Menu,
   X,
-  ExternalLink,
   LogOut,
 } from 'lucide-react';
 import { useParking } from '../../context/ParkingContext';
-import { isSupabaseConfigured } from '../../services/supabase';
 
 interface NavbarProps {
-  onOpenSupabaseModal: () => void;
+  onOpenSupabaseModal?: () => void;
   onOpenLgpdModal: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  onOpenSupabaseModal,
   onOpenLgpdModal,
   activeTab,
   setActiveTab,
@@ -138,23 +134,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Instalar App</span>
               </button>
             )}
-
-            {/* Supabase Status Pill */}
-            <button
-              onClick={onOpenSupabaseModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs transition-colors"
-              title="Configurar Supabase"
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                }`}
-              ></span>
-              <Database className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
-              <span className="text-slate-300 font-medium text-[11px]">
-                {isSupabaseConfigured ? 'Supabase' : 'Modo Demo'}
-              </span>
-            </button>
 
             {/* LGPD Button */}
             <button

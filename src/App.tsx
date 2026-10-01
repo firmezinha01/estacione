@@ -6,7 +6,6 @@ import { VehicleEntryModal } from './components/entry/VehicleEntryModal';
 import { TicketPrintModal } from './components/ticket/TicketPrintModal';
 import { QrScannerModal } from './components/scanner/QrScannerModal';
 import { CheckoutModal } from './components/checkout/CheckoutModal';
-import { SupabaseModal } from './components/common/SupabaseModal';
 import { LgpdModal } from './components/common/LgpdModal';
 import { AttendantDashboard } from './pages/attendant/AttendantDashboard';
 import { MensalistasPage } from './pages/attendant/MensalistasPage';
@@ -26,14 +25,9 @@ const MainContent: React.FC = () => {
   // Navigation
   const [activeTab, setActiveTab] = useState<string>('patio');
 
-  if (!isAuthenticated) {
-    return <LoginPage />;
-  }
-
-  // Modals state
+  // Modals state (declared unconditionally at the top)
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isLgpdModalOpen, setIsLgpdModalOpen] = useState(false);
 
   // Printing Modal state
@@ -57,6 +51,10 @@ const MainContent: React.FC = () => {
   });
 
   const [validatorInitialCode, setValidatorInitialCode] = useState<string>('');
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   // Handle entry creation: closes entry modal and opens ticket printer modal
   const handleEntrySuccess = (entry: Entry) => {
@@ -138,7 +136,6 @@ const MainContent: React.FC = () => {
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
         onOpenLgpdModal={() => setIsLgpdModalOpen(true)}
       />
 
@@ -224,11 +221,6 @@ const MainContent: React.FC = () => {
         isOpen={isScannerModalOpen}
         onClose={() => setIsScannerModalOpen(false)}
         onScanSuccess={handleQrScanSuccess}
-      />
-
-      <SupabaseModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
       />
 
       <LgpdModal isOpen={isLgpdModalOpen} onClose={() => setIsLgpdModalOpen(false)} />
