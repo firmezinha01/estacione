@@ -136,3 +136,29 @@
     visibility: hidden !important;
   }
 }
+
+/* Html5Qrcode reader container and video styles */
+#qr-reader-container {
+  width: 100% !important;
+  min-height: 260px !important;
+  position: relative !important;
+}
+
+#qr-reader-container video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 260px !important;
+  max-height: 320px !important;
+  object-fit: cover !important;
+  border-radius: 0.75rem !important;
+  display: block !important;
+}
+
+#qr-reader-container canvas {
+  display: none !important;
+}
+
+#qr-reader-container__scan_region {
+  min-height: 260px !important;
+}
+

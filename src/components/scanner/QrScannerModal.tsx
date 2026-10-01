@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, X, RefreshCw, Search, AlertCircle, Upload } from 'lucide-react';
+import { Camera, X, RefreshCw, Search, AlertCircle, Upload, CheckCircle2 } from 'lucide-react';
 import { extractTicketCode } from '../../utils/formatters';
+import { useParking } from '../../context/ParkingContext';
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -16,10 +17,12 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   onScanSuccess,
   title = 'Escanear QR Code do Ticket',
 }) => {
+  const { activeEntries } = useParking();
   const [manualCode, setManualCode] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scannerContainerId = 'qr-reader-container';
@@ -30,9 +33,10 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       return;
     }
 
+    // Delay slightly to ensure DOM element is mounted and styled
     const timer = setTimeout(() => {
       startScanner();
-    }, 250);
+    }, 300);
 
     return () => {
       clearTimeout(timer);
@@ -43,8 +47,16 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const startScanner = async () => {
     try {
       setErrorMsg(null);
+      setIsStarting(true);
       if (scannerRef.current) {
         await stopScanner();
+      }
+
+      // Check if container element exists in DOM
+      const containerEl = document.getElementById(scannerContainerId);
+      if (!containerEl) {
+        setIsStarting(false);
+        return;
       }
 
       const html5QrCode = new Html5Qrcode(scannerContainerId, {
@@ -57,27 +69,38 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
       scannerRef.current = html5QrCode;
 
-      // Dynamic qrbox to adapt seamlessly to mobile screens and orientation
       const config = {
-        fps: 12,
+        fps: 15,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
           const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
           const size = Math.floor(minEdge * 0.72);
           return {
-            width: Math.max(160, Math.min(size, 280)),
-            height: Math.max(160, Math.min(size, 280)),
+            width: Math.max(160, Math.min(size, 260)),
+            height: Math.max(160, Math.min(size, 260)),
           };
         },
       };
 
-      // Attempt to pick matching camera device ID if available
-      let cameraConfig: any = { facingMode: cameraFacing };
+      const handleScan = (decodedText: string) => {
+        if (navigator.vibrate) {
+          navigator.vibrate(150);
+        }
+        const cleanCode = extractTicketCode(decodedText);
+        stopScanner();
+        onScanSuccess(cleanCode);
+        onClose();
+      };
+
+      let started = false;
+
+      // Tier 1: Try device list via getCameras
       try {
         const cameras = await Html5Qrcode.getCameras();
         if (cameras && cameras.length > 0) {
+          let chosenId = cameras[0].id;
           if (cameraFacing === 'environment') {
             const backCam = cameras.find(c => {
-              const label = c.label.toLowerCase();
+              const label = (c.label || '').toLowerCase();
               return (
                 label.includes('back') ||
                 label.includes('traseira') ||
@@ -85,47 +108,56 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
                 label.includes('rear')
               );
             });
-            if (backCam) cameraConfig = backCam.id;
+            if (backCam) chosenId = backCam.id;
           } else {
             const frontCam = cameras.find(c => {
-              const label = c.label.toLowerCase();
+              const label = (c.label || '').toLowerCase();
               return (
                 label.includes('front') ||
                 label.includes('frontal') ||
                 label.includes('user')
               );
             });
-            if (frontCam) cameraConfig = frontCam.id;
+            if (frontCam) chosenId = frontCam.id;
           }
+
+          await html5QrCode.start(chosenId, config, handleScan, () => {});
+          started = true;
         }
-      } catch (e) {
-        // Fallback to facingMode constraint
+      } catch (camErr) {
+        console.warn('Tentativa 1 (getCameras) falhou, tentando facingMode:', camErr);
       }
 
-      await html5QrCode.start(
-        cameraConfig,
-        config,
-        (decodedText: string) => {
-          if (navigator.vibrate) {
-            navigator.vibrate(150);
-          }
-          const cleanCode = extractTicketCode(decodedText);
-          stopScanner();
-          onScanSuccess(cleanCode);
-          onClose();
-        },
-        (_errorMessage: string) => {
-          // Regular frame without QR code
+      // Tier 2: Try facingMode environment
+      if (!started) {
+        try {
+          await html5QrCode.start({ facingMode: cameraFacing }, config, handleScan, () => {});
+          started = true;
+        } catch (faceErr) {
+          console.warn('Tentativa 2 (facingMode) falhou, tentando facingMode user:', faceErr);
         }
-      );
+      }
+
+      // Tier 3: Fallback to facingMode user (desktop/laptop webcams)
+      if (!started) {
+        try {
+          await html5QrCode.start({ facingMode: 'user' }, config, handleScan, () => {});
+          started = true;
+        } catch (userErr) {
+          console.warn('Tentativa 3 (user webcam) falhou:', userErr);
+          throw userErr;
+        }
+      }
 
       setIsScanning(true);
+      setIsStarting(false);
     } catch (err: any) {
       console.warn('Erro ao inicializar câmera do scanner:', err);
       setErrorMsg(
-        'Não foi possível acessar a câmera. Verifique as permissões, envie uma foto do QR Code ou digite o código abaixo.'
+        'Acesso à câmera indisponível neste navegador. Verifique permissões, envie uma foto do QR Code ou digite o código abaixo.'
       );
       setIsScanning(false);
+      setIsStarting(false);
     }
   };
 
@@ -135,14 +167,18 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         if (scannerRef.current.isScanning) {
           await scannerRef.current.stop();
         }
+      } catch (err) {
+        console.warn('Erro ao parar scanner:', err);
+      }
+      try {
         await scannerRef.current.clear();
       } catch (err) {
-        console.warn('Erro ao finalizar scanner:', err);
-      } finally {
-        scannerRef.current = null;
-        setIsScanning(false);
+        console.warn('Erro ao limpar container do scanner:', err);
       }
+      scannerRef.current = null;
     }
+    setIsScanning(false);
+    setIsStarting(false);
   };
 
   const toggleCamera = () => {
@@ -187,8 +223,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Erro ao escanear imagem:', err);
-      setErrorMsg('Não foi possível identificar um QR Code legível na imagem. Digite o código manualmente.');
+      setErrorMsg('Não foi possível identificar um QR Code nítido na imagem. Tente digitar o código.');
     }
+  };
+
+  const handleQuickSelectTicket = (ticketCode: string) => {
+    stopScanner();
+    onScanSuccess(ticketCode);
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -219,22 +261,29 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
         </div>
 
         {/* Camera Scanner Viewport */}
-        <div className="my-4 relative">
-          <div
-            id={scannerContainerId}
-            className="w-full min-h-[260px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 relative flex items-center justify-center"
-          >
-            {!isScanning && !errorMsg && (
-              <div className="text-xs text-slate-400 animate-pulse flex flex-col items-center gap-2">
-                <RefreshCw className="w-6 h-6 animate-spin text-emerald-500" />
-                <span>Iniciando câmera...</span>
-              </div>
-            )}
-          </div>
+        <div className="my-4 relative min-h-[260px] bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+          {/* Dedicated Html5Qrcode element with ZERO React children to avoid reconciliation wiping video */}
+          <div id={scannerContainerId} className="w-full h-full min-h-[260px]" />
+
+          {/* Loading overlay - Sibling to avoid DOM removal */}
+          {isStarting && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-xs text-slate-400 gap-2 pointer-events-none z-10">
+              <RefreshCw className="w-6 h-6 animate-spin text-emerald-500" />
+              <span>Iniciando câmera...</span>
+            </div>
+          )}
+
+          {/* Error overlay - Sibling */}
+          {errorMsg && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-slate-950/95 text-center z-10">
+              <AlertCircle className="w-8 h-8 text-amber-400 mb-2" />
+              <span className="text-xs text-amber-200">{errorMsg}</span>
+            </div>
+          )}
 
           {/* Scanner targeting overlay reticle */}
-          {isScanning && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          {isScanning && !errorMsg && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-10">
               <div className="w-52 h-52 border-2 border-emerald-500/80 rounded-2xl relative shadow-[0_0_20px_rgba(16,185,129,0.3)]">
                 <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg"></div>
                 <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg"></div>
@@ -247,7 +296,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
           {/* Camera controls toolbar */}
           {isScanning && (
-            <div className="absolute top-3 right-3 flex gap-2">
+            <div className="absolute top-3 right-3 flex gap-2 z-20">
               <button
                 onClick={toggleCamera}
                 className="p-2 bg-slate-900/80 hover:bg-slate-800 text-white rounded-lg backdrop-blur-sm border border-slate-700 shadow transition-all active:scale-90"
@@ -258,13 +307,6 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             </div>
           )}
         </div>
-
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-amber-300 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
 
         {/* Upload QR image option */}
         <div className="mb-3 text-center">
@@ -284,6 +326,35 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             <span>Carregar imagem/foto do QR Code</span>
           </button>
         </div>
+
+        {/* Quick select active ticket shortcut for fast testing */}
+        {activeEntries.length > 0 && (
+          <div className="mb-3 pt-2 border-t border-slate-800/80">
+            <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">
+              Ou selecione um veículo no pátio para validar:
+            </span>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+              {activeEntries.slice(0, 4).map(entry => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  onClick={() =>
+                    handleQuickSelectTicket(
+                      entry.label?.codigo_unico || entry.vehicle?.placa || ''
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 hover:bg-blue-950/60 border border-slate-800 hover:border-blue-700 rounded-lg text-xs font-mono text-slate-200 transition-colors"
+                >
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span className="font-bold">{entry.vehicle?.placa}</span>
+                  <span className="text-[10px] text-slate-400">
+                    ({entry.label?.codigo_unico})
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Manual Input Fallback */}
         <form onSubmit={handleManualSubmit} className="pt-2 border-t border-slate-800">
