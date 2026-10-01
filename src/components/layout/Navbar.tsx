@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ExternalLink,
+  LogOut,
 } from 'lucide-react';
 import { useParking } from '../../context/ParkingContext';
 import { isSupabaseConfigured } from '../../services/supabase';
@@ -27,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
 }) => {
-  const { currentUser, switchUserRole, activeEntries, settings } = useParking();
+  const { currentUser, switchUserRole, activeEntries, settings, logout } = useParking();
   const [time, setTime] = useState(new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -192,6 +193,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
+            {/* Logout Button */}
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 hover:bg-red-950/60 border border-slate-800 hover:border-red-800/80 rounded-xl text-slate-300 hover:text-red-300 text-xs font-semibold transition-colors"
+              title="Sair do Sistema"
+            >
+              <LogOut className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -279,6 +290,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 </>
               )}
+              <button
+                onClick={() => {
+                  logout();
+                  setMobileMenuOpen(false);
+                }}
+                className="col-span-2 p-2 bg-red-950/40 hover:bg-red-900/50 border border-red-800/60 rounded-lg text-xs font-bold text-red-300 flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5 text-red-400" />
+                <span>Sair do Sistema</span>
+              </button>
             </div>
           </div>
         )}

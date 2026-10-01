@@ -16,13 +16,19 @@ import { TariffSettings } from './pages/admin/TariffSettings';
 import { ReportsPage } from './pages/admin/ReportsPage';
 import { UserManagement } from './pages/admin/UserManagement';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
+import { LoginPage } from './pages/auth/LoginPage';
+import { extractTicketCode } from './utils/formatters';
 import { Entry, Vehicle } from './types/parking';
 
 const MainContent: React.FC = () => {
-  const { entries, settings, createVehicleEntry } = useParking();
+  const { entries, settings, createVehicleEntry, isAuthenticated } = useParking();
 
   // Navigation
   const [activeTab, setActiveTab] = useState<string>('patio');
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   // Modals state
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
@@ -74,7 +80,7 @@ const MainContent: React.FC = () => {
 
   // Handle QR scanner detection
   const handleQrScanSuccess = (decodedCode: string) => {
-    const cleanCode = decodedCode.trim().toUpperCase();
+    const cleanCode = extractTicketCode(decodedCode);
     const cleanPlate = cleanCode.replace(/[^A-Z0-9]/g, '');
 
     // Search in entries
@@ -82,7 +88,12 @@ const MainContent: React.FC = () => {
       const ticket = e.label?.codigo_unico?.toUpperCase();
       const entryIdPrefix = e.id.substring(0, 8).toUpperCase();
       const plate = e.vehicle?.placa?.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      return ticket === cleanCode || entryIdPrefix === cleanCode || (plate && plate === cleanPlate);
+      return (
+        ticket === cleanCode ||
+        entryIdPrefix === cleanCode ||
+        e.id.toUpperCase() === cleanCode ||
+        (plate && plate === cleanPlate)
+      );
     });
 
     if (found) {

@@ -94,3 +94,30 @@ export function formatPhone(phone?: string): string {
   }
   return phone;
 }
+
+export function extractTicketCode(rawInput: string): string {
+  if (!rawInput) return '';
+  let text = rawInput.trim();
+  // Strip URLs like http://.../validar/EST-123456 or https://.../#/validar/EST-123456
+  if (text.includes('/validar/')) {
+    text = text.substring(text.lastIndexOf('/validar/') + 9);
+  } else if (text.includes('/ticket/')) {
+    text = text.substring(text.lastIndexOf('/ticket/') + 8);
+  } else if (text.includes('/')) {
+    text = text.substring(text.lastIndexOf('/') + 1);
+  }
+  if (text.includes('?code=')) {
+    text = text.split('?code=')[1].split('&')[0];
+  }
+  return text.replace(/[?#].*$/, '').trim().toUpperCase();
+}
+
+export function formatWhatsAppUrl(phone?: string, text?: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
+  const countryDigits = (digits.length === 10 || digits.length === 11) ? `55${digits}` : digits;
+  const msg = text ? `?text=${encodeURIComponent(text)}` : '';
+  return `https://wa.me/${countryDigits}${msg}`;
+}
+

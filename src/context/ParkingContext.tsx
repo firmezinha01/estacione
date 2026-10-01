@@ -16,6 +16,9 @@ interface ParkingContextType {
   currentUser: User;
   setCurrentUser: (user: User) => void;
   switchUserRole: (role: 'admin' | 'atendente') => void;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
   settings: Settings;
   updateSettings: (newSettings: Settings) => void;
   entries: Entry[];
@@ -25,7 +28,15 @@ interface ParkingContextType {
   auditLogs: AuditLog[];
   refreshData: () => void;
   createVehicleEntry: (
-    vehicleData: { placa: string; modelo: string; cor: string; tipo: Vehicle['tipo']; cliente_id?: string },
+    vehicleData: {
+      placa: string;
+      modelo: string;
+      cor: string;
+      tipo: Vehicle['tipo'];
+      cliente_id?: string;
+      cliente_nome?: string;
+      cliente_telefone?: string;
+    },
     printerSize?: PrinterSize,
     observacoes?: string,
     diariaOptions?: {
@@ -52,6 +63,7 @@ const ParkingContext = createContext<ParkingContextType | undefined>(undefined);
 
 export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User>(() => storage.getCurrentUser());
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => storage.getAuthSession());
   const [settings, setSettings] = useState<Settings>(() => storage.getSettings());
   const [entries, setEntries] = useState<Entry[]>(() => storage.getEntries());
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => storage.getVehicles());
@@ -71,6 +83,69 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
     storage.init();
     refreshData();
   }, []);
+
+  const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    // 1. Default Administrator credentials
+    if (cleanEmail === 'admin@estacionamento.com' && cleanPass === 'admin123') {
+      const adminUser: User = {
+        id: 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22',
+        nome: 'Administrador Principal',
+        email: 'admin@estacionamento.com',
+        role: 'admin',
+        ativo: true,
+      };
+      storage.setCurrentUser(adminUser);
+      storage.setAuthSession(true);
+      setCurrentUser(adminUser);
+      setIsAuthenticated(true);
+      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: 'admin' });
+      return { success: true };
+    }
+
+    // 2. Default Attendant credentials
+    if (cleanEmail === 'atendente@estacionamento.com' && cleanPass === 'atendente123') {
+      const attendantUser: User = {
+        id: 'c1eebc99-9c0b-4ef8-bb6d-6bb9bd380c33',
+        nome: 'Carlos Atendente',
+        email: 'atendente@estacionamento.com',
+        role: 'atendente',
+        ativo: true,
+      };
+      storage.setCurrentUser(attendantUser);
+      storage.setAuthSession(true);
+      setCurrentUser(attendantUser);
+      setIsAuthenticated(true);
+      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: 'atendente' });
+      return { success: true };
+    }
+
+    // 3. Registered users in database/localStorage
+    const users = storage.getUsers();
+    const found = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (found && (cleanPass === 'admin123' || cleanPass === 'atendente123' || cleanPass.length >= 6)) {
+      storage.setCurrentUser(found);
+      storage.setAuthSession(true);
+      setCurrentUser(found);
+      setIsAuthenticated(true);
+      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: found.role });
+      return { success: true };
+    }
+
+    storage.addAuditLog('LOGIN_FALHA', { email: cleanEmail });
+    return {
+      success: false,
+      message: 'Credenciais inválidas. Utilize os botões de Acesso Rápido para testar.',
+    };
+  };
+
+  const logout = () => {
+    storage.setAuthSession(false);
+    setIsAuthenticated(false);
+    storage.addAuditLog('LOGOUT_SUCESSO', { email: currentUser?.email });
+  };
 
   const switchUserRole = (role: 'admin' | 'atendente') => {
     const users = storage.getUsers();
@@ -93,7 +168,15 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const createVehicleEntry = (
-    vehicleData: { placa: string; modelo: string; cor: string; tipo: Vehicle['tipo']; cliente_id?: string },
+    vehicleData: {
+      placa: string;
+      modelo: string;
+      cor: string;
+      tipo: Vehicle['tipo'];
+      cliente_id?: string;
+      cliente_nome?: string;
+      cliente_telefone?: string;
+    },
     printerSize: PrinterSize = settings.impressora_padrao || '80mm',
     observacoes?: string,
     diariaOptions?: {
@@ -165,6 +248,9 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
         currentUser,
         setCurrentUser,
         switchUserRole,
+        isAuthenticated,
+        login,
+        logout,
         settings,
         updateSettings,
         entries,

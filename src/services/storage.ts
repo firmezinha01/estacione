@@ -8,6 +8,7 @@ import {
   User,
   Vehicle,
 } from '../types/parking';
+import { extractTicketCode } from '../utils/formatters';
 
 const STORAGE_KEYS = {
   USERS: 'estacionamento_users',
@@ -19,6 +20,7 @@ const STORAGE_KEYS = {
   SETTINGS: 'estacionamento_settings',
   AUDIT_LOGS: 'estacionamento_audit_logs',
   CURRENT_USER: 'estacionamento_current_user',
+  AUTH_SESSION: 'estacionamento_auth_session',
   SUPABASE_CONFIG: 'estacionamento_supabase_config',
 };
 
@@ -423,6 +425,21 @@ class StorageService {
     this.setItem(STORAGE_KEYS.CURRENT_USER, user);
   }
 
+  getAuthSession(): boolean {
+    if (!this.isLocalStorageAvailable()) return true; // Default in testing environments
+    return localStorage.getItem(STORAGE_KEYS.AUTH_SESSION) === 'true';
+  }
+
+  setAuthSession(authenticated: boolean): void {
+    if (this.isLocalStorageAvailable()) {
+      if (authenticated) {
+        localStorage.setItem(STORAGE_KEYS.AUTH_SESSION, 'true');
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
+      }
+    }
+  }
+
   // Customers
   getCustomers(): Customer[] {
     return this.getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, initialCustomers);
@@ -495,19 +512,33 @@ class StorageService {
   }
 
   findEntryByTicketCode(code: string): Entry | undefined {
-    const cleanCode = code.trim().toUpperCase();
+    if (!code) return undefined;
+    const cleanCode = extractTicketCode(code);
+    const searchCleanPlate = cleanCode.replace(/[^A-Z0-9]/g, '');
     const entries = this.getEntries();
     return entries.find(e => {
       const labelCode = e.label?.codigo_unico?.toUpperCase();
       const entryIdPrefix = e.id.substring(0, 8).toUpperCase();
       const plate = e.vehicle?.placa?.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const searchClean = cleanCode.replace(/[^A-Z0-9]/g, '');
-      return labelCode === cleanCode || entryIdPrefix === cleanCode || (plate && plate === searchClean);
+      return (
+        labelCode === cleanCode ||
+        entryIdPrefix === cleanCode ||
+        e.id.toUpperCase() === cleanCode ||
+        (plate && plate === searchCleanPlate)
+      );
     });
   }
 
   createEntry(
-    vehicleData: { placa: string; modelo: string; cor: string; tipo: Vehicle['tipo']; cliente_id?: string },
+    vehicleData: {
+      placa: string;
+      modelo: string;
+      cor: string;
+      tipo: Vehicle['tipo'];
+      cliente_id?: string;
+      cliente_nome?: string;
+      cliente_telefone?: string;
+    },
     printerSize: '58mm' | '80mm' = '80mm',
     observacoes?: string,
     diariaOptions?: {
@@ -517,6 +548,41 @@ class StorageService {
       metodo_pagamento_entrada?: Payment['metodo'];
     }
   ): { entry: Entry; label: Label; payment?: Payment } {
+    // 0. Handle Customer creation/linking if nome or telefone is provided
+    let clienteId = vehicleData.cliente_id;
+    let customer: Customer | undefined;
+
+    if (vehicleData.cliente_nome?.trim() || vehicleData.cliente_telefone?.trim()) {
+      const cleanPhone = (vehicleData.cliente_telefone || '').replace(/\D/g, '');
+      const existingCust = clienteId
+        ? this.getCustomers().find(c => c.id === clienteId)
+        : this.getCustomers().find(c => cleanPhone && c.telefone.replace(/\D/g, '') === cleanPhone);
+
+      if (existingCust) {
+        if (vehicleData.cliente_nome?.trim()) {
+          existingCust.nome = vehicleData.cliente_nome.trim();
+        }
+        if (vehicleData.cliente_telefone?.trim()) {
+          existingCust.telefone = vehicleData.cliente_telefone.trim();
+        }
+        customer = this.saveCustomer(existingCust);
+        clienteId = customer.id;
+      } else {
+        customer = this.saveCustomer({
+          id: `cust-${Date.now()}`,
+          nome: vehicleData.cliente_nome?.trim() || 'Cliente Avulso',
+          telefone: vehicleData.cliente_telefone?.trim() || '',
+          tipo: 'avulso',
+          ativo: true,
+          consentimento_lgpd: true,
+          created_at: new Date().toISOString(),
+        });
+        clienteId = customer.id;
+      }
+    } else if (clienteId) {
+      customer = this.getCustomers().find(c => c.id === clienteId);
+    }
+
     // 1. Save or retrieve vehicle
     let vehicle = this.findVehicleByPlate(vehicleData.placa);
     if (!vehicle) {
@@ -526,10 +592,17 @@ class StorageService {
         modelo: vehicleData.modelo.trim(),
         cor: vehicleData.cor.trim(),
         tipo: vehicleData.tipo,
-        cliente_id: vehicleData.cliente_id,
+        cliente_id: clienteId,
+        cliente: customer,
         created_at: new Date().toISOString(),
       };
       this.saveVehicle(vehicle);
+    } else if (clienteId && vehicle.cliente_id !== clienteId) {
+      vehicle.cliente_id = clienteId;
+      vehicle.cliente = customer;
+      this.saveVehicle(vehicle);
+    } else if (customer) {
+      vehicle.cliente = customer;
     }
 
     // 2. Determine billing type

@@ -15,6 +15,8 @@ import {
   CreditCard,
   Clock,
   Sparkles,
+  Phone,
+  User,
 } from 'lucide-react';
 import { useParking } from '../../context/ParkingContext';
 import { PaymentMethod, PrinterSize, VehicleType } from '../../types/parking';
@@ -38,6 +40,8 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
   const [cor, setCor] = useState('');
   const [tipo, setTipo] = useState<VehicleType>('carro');
   const [clienteId, setClienteId] = useState<string>('');
+  const [nomeCliente, setNomeCliente] = useState<string>('');
+  const [whatsappCliente, setWhatsappCliente] = useState<string>('');
   const [printerSize, setPrinterSize] = useState<PrinterSize>(settings.impressora_padrao || '80mm');
   const [observacoes, setObservacoes] = useState('');
   const [matchedCustomer, setMatchedCustomer] = useState<any>(null);
@@ -56,6 +60,8 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
       setCor('');
       setTipo('carro');
       setClienteId('');
+      setNomeCliente('');
+      setWhatsappCliente('');
       setObservacoes('');
       setMatchedCustomer(null);
       setPrinterSize(settings.impressora_padrao || '80mm');
@@ -89,6 +95,10 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
         setClienteId(found.cliente_id);
         const cust = customers.find(c => c.id === found.cliente_id);
         setMatchedCustomer(cust);
+        if (cust) {
+          setNomeCliente(cust.nome || '');
+          setWhatsappCliente(cust.telefone || '');
+        }
       }
     } else {
       setMatchedCustomer(null);
@@ -99,6 +109,28 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
     setClienteId(id);
     const cust = customers.find(c => c.id === id);
     setMatchedCustomer(cust || null);
+    if (cust) {
+      setNomeCliente(cust.nome || '');
+      setWhatsappCliente(cust.telefone || '');
+    }
+  };
+
+  const handleWhatsappChange = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    let formatted = digits;
+    if (digits.length <= 10) {
+      formatted = digits.replace(/(\d{2})(\d{0,4})(\d{0,4})/, (_m, p1, p2, p3) => {
+        if (!p2) return `(${p1}`;
+        if (!p3) return `(${p1}) ${p2}`;
+        return `(${p1}) ${p2}-${p3}`;
+      });
+    } else {
+      formatted = digits.substring(0, 11).replace(/(\d{2})(\d{5})(\d{0,4})/, (_m, p1, p2, p3) => {
+        if (!p3) return `(${p1}) ${p2}`;
+        return `(${p1}) ${p2}-${p3}`;
+      });
+    }
+    setWhatsappCliente(formatted);
   };
 
   const valorDiariaNum = parseFloat(valorDiaria) || 0;
@@ -132,6 +164,8 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
         cor: cor.trim() || 'Cor Não Informada',
         tipo,
         cliente_id: clienteId || undefined,
+        cliente_nome: nomeCliente.trim() || undefined,
+        cliente_telefone: whatsappCliente.trim() || undefined,
       },
       printerSize,
       observacoes.trim() || undefined,
@@ -303,23 +337,70 @@ export const VehicleEntryModal: React.FC<VehicleEntryModalProps> = ({
             </div>
           </div>
 
-          {/* Customer Association */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Vincular Cliente (Opcional)
-            </label>
-            <select
-              value={clienteId}
-              onChange={e => handleCustomerSelect(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
-            >
-              <option value="">Cliente Avulso (Sem cadastro)</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.nome} {c.tipo === 'mensalista' ? '★ MENSALISTA' : ''} ({c.telefone})
-                </option>
-              ))}
-            </select>
+          {/* Customer Info: Name & WhatsApp */}
+          <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <User className="w-4 h-4 text-emerald-400" />
+                <span>Identificação do Cliente (Opcional)</span>
+              </label>
+              {customers.length > 0 && (
+                <div className="text-[11px] text-slate-400">
+                  <select
+                    value={clienteId}
+                    onChange={e => handleCustomerSelect(e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none"
+                  >
+                    <option value="">Buscar cadastrado...</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} {c.tipo === 'mensalista' ? '(Mensalista)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Nome do Cliente
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <User className="w-3.5 h-3.5" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Ex: João da Silva"
+                    value={nomeCliente}
+                    onChange={e => setNomeCliente(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>WhatsApp do Cliente</span>
+                  <span className="text-[10px] text-emerald-400 font-normal">com DDD</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-500">
+                    <Phone className="w-3.5 h-3.5" />
+                  </div>
+                  <input
+                    type="tel"
+                    maxLength={15}
+                    placeholder="Ex: (11) 98765-4321"
+                    value={whatsappCliente}
+                    onChange={e => handleWhatsappChange(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 focus:border-blue-500 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none font-mono"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ======================================================== */}

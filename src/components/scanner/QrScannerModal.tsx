@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { Camera, X, RefreshCw, Zap, Search, AlertCircle } from 'lucide-react';
+import { Camera, X, RefreshCw, Search, AlertCircle, Upload } from 'lucide-react';
+import { extractTicketCode } from '../../utils/formatters';
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scannerContainerId = 'qr-reader-container';
 
   useEffect(() => {
@@ -55,26 +57,65 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
 
       scannerRef.current = html5QrCode;
 
+      // Dynamic qrbox to adapt seamlessly to mobile screens and orientation
       const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
+        fps: 12,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.floor(minEdge * 0.72);
+          return {
+            width: Math.max(160, Math.min(size, 280)),
+            height: Math.max(160, Math.min(size, 280)),
+          };
+        },
       };
 
+      // Attempt to pick matching camera device ID if available
+      let cameraConfig: any = { facingMode: cameraFacing };
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          if (cameraFacing === 'environment') {
+            const backCam = cameras.find(c => {
+              const label = c.label.toLowerCase();
+              return (
+                label.includes('back') ||
+                label.includes('traseira') ||
+                label.includes('environment') ||
+                label.includes('rear')
+              );
+            });
+            if (backCam) cameraConfig = backCam.id;
+          } else {
+            const frontCam = cameras.find(c => {
+              const label = c.label.toLowerCase();
+              return (
+                label.includes('front') ||
+                label.includes('frontal') ||
+                label.includes('user')
+              );
+            });
+            if (frontCam) cameraConfig = frontCam.id;
+          }
+        }
+      } catch (e) {
+        // Fallback to facingMode constraint
+      }
+
       await html5QrCode.start(
-        { facingMode: cameraFacing },
+        cameraConfig,
         config,
         (decodedText: string) => {
-          // Success callback
           if (navigator.vibrate) {
             navigator.vibrate(150);
           }
+          const cleanCode = extractTicketCode(decodedText);
           stopScanner();
-          onScanSuccess(decodedText.trim());
+          onScanSuccess(cleanCode);
           onClose();
         },
         (_errorMessage: string) => {
-          // Scanning frame without QR, normal behavior
+          // Regular frame without QR code
         }
       );
 
@@ -82,7 +123,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     } catch (err: any) {
       console.warn('Erro ao inicializar câmera do scanner:', err);
       setErrorMsg(
-        'Não foi possível acessar a câmera. Verifique as permissões ou digite o código manualmente abaixo.'
+        'Não foi possível acessar a câmera. Verifique as permissões, envie uma foto do QR Code ou digite o código abaixo.'
       );
       setIsScanning(false);
     }
@@ -111,9 +152,43 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
+    const cleanCode = extractTicketCode(manualCode.trim());
     stopScanner();
-    onScanSuccess(manualCode.trim());
+    onScanSuccess(cleanCode);
     onClose();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setErrorMsg(null);
+      let html5QrCode = scannerRef.current;
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode(scannerContainerId, {
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
+          verbose: false,
+        });
+        scannerRef.current = html5QrCode;
+      } else if (html5QrCode.isScanning) {
+        await html5QrCode.stop();
+      }
+
+      const decodedText = await html5QrCode.scanFile(file, true);
+      if (decodedText) {
+        const cleanCode = extractTicketCode(decodedText);
+        stopScanner();
+        onScanSuccess(cleanCode);
+        onClose();
+      }
+    } catch (err: any) {
+      console.warn('Erro ao escanear imagem:', err);
+      setErrorMsg('Não foi possível identificar um QR Code legível na imagem. Digite o código manualmente.');
+    }
   };
 
   if (!isOpen) return null;
@@ -190,6 +265,25 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             <span>{errorMsg}</span>
           </div>
         )}
+
+        {/* Upload QR image option */}
+        <div className="mb-3 text-center">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 transition-colors py-1 px-2.5 rounded-lg hover:bg-slate-800/60 border border-transparent hover:border-slate-700"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Carregar imagem/foto do QR Code</span>
+          </button>
+        </div>
 
         {/* Manual Input Fallback */}
         <form onSubmit={handleManualSubmit} className="pt-2 border-t border-slate-800">

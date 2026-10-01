@@ -13,7 +13,7 @@ import {
 import { useParking } from '../../context/ParkingContext';
 import { Entry } from '../../types/parking';
 import { calculateTariff } from '../../services/tariffCalculator';
-import { formatBRL, formatDateTime } from '../../utils/formatters';
+import { formatBRL, formatDateTime, extractTicketCode } from '../../utils/formatters';
 
 interface TicketValidatorPublicProps {
   onBack: () => void;
@@ -30,35 +30,44 @@ export const TicketValidatorPublic: React.FC<TicketValidatorPublicProps> = ({
 }) => {
   const { entries, settings } = useParking();
   const [code, setCode] = useState(initialCode);
-  const [searchedEntry, setSearchedEntry] = useState<Entry | null>(() => {
-    if (!initialCode) return null;
-    return (
-      entries.find(
-        e =>
-          e.label?.codigo_unico?.toUpperCase() === initialCode.toUpperCase() ||
-          e.vehicle?.placa?.toUpperCase().replace(/[^A-Z0-9]/g, '') ===
-            initialCode.toUpperCase().replace(/[^A-Z0-9]/g, '')
-      ) || null
-    );
-  });
-  const [hasSearched, setHasSearched] = useState(Boolean(initialCode));
+  const [searchedEntry, setSearchedEntry] = useState<Entry | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!code.trim()) return;
+  const doSearch = (query: string) => {
+    if (!query.trim()) {
+      setSearchedEntry(null);
+      setHasSearched(false);
+      return;
+    }
 
-    const cleanInput = code.trim().toUpperCase();
+    const cleanInput = extractTicketCode(query);
     const cleanSearchPlate = cleanInput.replace(/[^A-Z0-9]/g, '');
 
     const found = entries.find(e => {
       const ticketCode = e.label?.codigo_unico?.toUpperCase();
       const entryIdPrefix = e.id.substring(0, 8).toUpperCase();
       const plateClean = e.vehicle?.placa?.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      return ticketCode === cleanInput || entryIdPrefix === cleanInput || (plateClean && plateClean === cleanSearchPlate);
+      return (
+        ticketCode === cleanInput ||
+        entryIdPrefix === cleanInput ||
+        (plateClean && plateClean === cleanSearchPlate)
+      );
     });
 
     setSearchedEntry(found || null);
     setHasSearched(true);
+  };
+
+  React.useEffect(() => {
+    if (initialCode) {
+      setCode(initialCode);
+      doSearch(initialCode);
+    }
+  }, [initialCode, entries]);
+
+  const handleSearch = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    doSearch(code);
   };
 
   const isMensalista = searchedEntry?.vehicle?.cliente?.tipo === 'mensalista';

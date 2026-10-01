@@ -14,11 +14,12 @@ import {
   Filter,
   UserCheck,
   RefreshCw,
+  Phone,
 } from 'lucide-react';
 import { useParking } from '../../context/ParkingContext';
 import { Entry, VehicleType } from '../../types/parking';
 import { calculateTariff } from '../../services/tariffCalculator';
-import { formatBRL, formatDateTime, formatPlate } from '../../utils/formatters';
+import { formatBRL, formatDateTime, formatPlate, formatWhatsAppUrl } from '../../utils/formatters';
 
 interface AttendantDashboardProps {
   onOpenEntryModal: () => void;
@@ -276,6 +277,22 @@ export const AttendantDashboard: React.FC<AttendantDashboardProps> = ({
                       <span className="py-0.5 px-2 bg-slate-950/70 border border-slate-800 rounded text-xs text-slate-300 truncate max-w-[180px]">
                         {entry.vehicle.cliente.nome}
                       </span>
+                    )}
+
+                    {entry.vehicle?.cliente?.telefone && (
+                      <a
+                        href={formatWhatsAppUrl(
+                          entry.vehicle.cliente.telefone,
+                          `Olá ${entry.vehicle.cliente.nome || ''}, referente ao veículo ${entry.vehicle.placa} no ${settings.nome_estabelecimento}:`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 py-0.5 px-2 bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800/80 rounded text-xs text-emerald-300 transition-colors"
+                        title="Conversar no WhatsApp"
+                      >
+                        <Phone className="w-3 h-3 text-emerald-400" />
+                        <span>{entry.vehicle.cliente.telefone}</span>
+                      </a>
                     )}
 
                     {isMensalista && (

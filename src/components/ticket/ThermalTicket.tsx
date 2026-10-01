@@ -84,6 +84,9 @@ export const ThermalTicket: React.FC<ThermalTicketProps> = ({
       {entry.vehicle?.cliente && (
         <div className="mt-1 pt-1 border-t border-dashed border-black text-xs font-bold text-black">
           <div>Cliente: {entry.vehicle.cliente.nome}</div>
+          {entry.vehicle.cliente.telefone && (
+            <div>WhatsApp: {entry.vehicle.cliente.telefone}</div>
+          )}
           {entry.vehicle.cliente.tipo === 'mensalista' && (
             <div className="inline-block bg-black text-white px-2 py-0.5 text-[10px] font-black uppercase rounded mt-0.5">
               MENSALISTA LIBERADO

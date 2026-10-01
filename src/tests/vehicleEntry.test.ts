@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { storage } from '../services/storage';
-import { formatPlate, isValidPlate } from '../utils/formatters';
+import { formatPlate, isValidPlate, extractTicketCode, formatWhatsAppUrl } from '../utils/formatters';
 
 describe('Validação de Veículos e Entrada (vehicleEntry)', () => {
   beforeEach(() => {
@@ -74,4 +74,41 @@ describe('Validação de Veículos e Entrada (vehicleEntry)', () => {
     expect(checkoutResult.success).toBe(true);
     expect(checkoutResult.entry?.status).toBe('pago');
   });
+
+  it('deve registrar entrada com Nome do Cliente e WhatsApp e associar ao veículo', () => {
+    const { entry } = storage.createEntry(
+      {
+        placa: 'WPP1A23',
+        modelo: 'Corolla Altis',
+        cor: 'Prata',
+        tipo: 'carro',
+        cliente_nome: 'Carlos Eduardo Silva',
+        cliente_telefone: '(11) 98765-4321',
+      },
+      '80mm',
+      'Entrada com cliente e zap'
+    );
+
+    expect(entry.vehicle?.cliente).toBeDefined();
+    expect(entry.vehicle?.cliente?.nome).toBe('Carlos Eduardo Silva');
+    expect(entry.vehicle?.cliente?.telefone).toBe('(11) 98765-4321');
+
+    // Ao buscar a entrada por ticket ou placa, cliente e telefone devem estar disponíveis
+    const found = storage.findEntryByTicketCode(entry.label?.codigo_unico || '');
+    expect(found?.vehicle?.cliente?.nome).toBe('Carlos Eduardo Silva');
+    expect(found?.vehicle?.cliente?.telefone).toBe('(11) 98765-4321');
+  });
+
+  it('deve extrair código do ticket de URLs completas, rotas e query params', () => {
+    expect(extractTicketCode('EST-8B7C52')).toBe('EST-8B7C52');
+    expect(extractTicketCode('https://estacione.vercel.app/validar/EST-8B7C52')).toBe('EST-8B7C52');
+    expect(extractTicketCode('http://localhost:5173/validar/EST-8B7C52?ref=scanner')).toBe('EST-8B7C52');
+    expect(extractTicketCode('https://estacione.vercel.app/#/ticket/EST-99AA11')).toBe('EST-99AA11');
+    expect(extractTicketCode('bra2e19')).toBe('BRA2E19');
+
+    // WhatsApp URL
+    const zapUrl = formatWhatsAppUrl('(11) 98765-4321', 'Olá Carlos');
+    expect(zapUrl).toContain('https://wa.me/5511987654321?text=');
+  });
 });
+
