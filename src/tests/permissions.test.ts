@@ -36,4 +36,33 @@ describe('Controle de Permissões (Atendente vs Administrador)', () => {
     expect(configLog).toBeDefined();
     expect(configLog?.detalhes?.tarifa_hora).toBe(15.0);
   });
+
+  it('deve possuir administrador padrão com login admin e senha 123456', () => {
+    const users = storage.getUsers();
+    const admin = users.find(u => u.email === 'admin' && u.role === 'admin');
+
+    expect(admin).toBeDefined();
+    expect(admin?.senha).toBe('123456');
+  });
+
+  it('deve cadastrar novo operador com senha e permitir armazenamento seguro', () => {
+    const users = storage.getUsers();
+    const novoOperador = {
+      id: 'usr-teste-01',
+      nome: 'Juliana Operadora',
+      email: 'juliana',
+      senha: 'minhasenha123',
+      role: 'atendente' as const,
+      ativo: true,
+      created_at: new Date().toISOString(),
+    };
+
+    storage.saveUsers([...users, novoOperador]);
+
+    const updated = storage.getUsers();
+    const found = updated.find(u => u.email === 'juliana');
+    expect(found).toBeDefined();
+    expect(found?.senha).toBe('minhasenha123');
+    expect(found?.role).toBe('atendente');
+  });
 });

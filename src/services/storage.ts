@@ -60,18 +60,20 @@ export const initialSettings: Settings = {
 export const initialUsers: User[] = [
   {
     id: 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22',
-    nome: 'Administrador Geral',
-    email: 'admin@estacionamento.com',
+    nome: 'Administrador',
+    email: 'admin',
     role: 'admin',
     ativo: true,
+    senha: '123456',
     created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
   },
   {
     id: 'c1eebc99-9c0b-4ef8-bb6d-6bb9bd380c33',
     nome: 'Carlos Atendente',
-    email: 'atendente@estacionamento.com',
+    email: 'atendente',
     role: 'atendente',
     ativo: true,
+    senha: 'atendente123',
     created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
   },
 ];
@@ -455,7 +457,38 @@ class StorageService {
 
   // Users
   getUsers(): User[] {
-    return this.getItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
+    const list = this.getItem<User[]>(STORAGE_KEYS.USERS, initialUsers);
+    let modified = false;
+
+    // Ensure admin user exists with email: 'admin' and senha: '123456'
+    const adminIndex = list.findIndex(u => u.email === 'admin' || u.role === 'admin');
+    if (adminIndex === -1) {
+      list.unshift(initialUsers[0]);
+      modified = true;
+    } else {
+      if (list[adminIndex].email !== 'admin' || list[adminIndex].senha !== '123456') {
+        list[adminIndex] = {
+          ...list[adminIndex],
+          email: 'admin',
+          senha: '123456',
+        };
+        modified = true;
+      }
+    }
+
+    // Ensure all users have a fallback senha
+    list.forEach(u => {
+      if (!u.senha) {
+        u.senha = u.role === 'admin' ? '123456' : 'atendente123';
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      this.setItem(STORAGE_KEYS.USERS, list);
+    }
+
+    return list;
   }
 
   saveUsers(users: User[]): void {

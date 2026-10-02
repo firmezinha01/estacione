@@ -65,10 +65,23 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ onSelectEntryForPrint 
   }, [entries, searchTerm, statusFilter, dateFilter]);
 
   // Aggregate stats for filtered list
+  const totalSomaTodosTickets = useMemo(() => {
+    return filteredEntries.reduce((acc, curr) => {
+      const val = curr.valor_total || curr.tarifa_calculada || curr.payment?.valor || 0;
+      return acc + val;
+    }, 0);
+  }, [filteredEntries]);
+
   const totalReceita = useMemo(() => {
     return filteredEntries
       .filter(e => e.status === 'pago')
-      .reduce((acc, curr) => acc + (curr.valor_total || 0), 0);
+      .reduce((acc, curr) => acc + (curr.payment?.valor || curr.valor_total || curr.tarifa_calculada || 0), 0);
+  }, [filteredEntries]);
+
+  const totalEmAberto = useMemo(() => {
+    return filteredEntries
+      .filter(e => e.status === 'ativo')
+      .reduce((acc, curr) => acc + (curr.valor_total || curr.tarifa_calculada || 0), 0);
   }, [filteredEntries]);
 
   const handleExportCsv = () => {
@@ -101,12 +114,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ onSelectEntryForPrint 
       </div>
 
       {/* Summary KPI Pills */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-slate-900/90 border border-emerald-500/30 rounded-xl p-3.5 flex items-center justify-between shadow-lg shadow-emerald-950/20">
           <div>
-            <span className="text-slate-400 text-xs block">Receita no Período</span>
+            <span className="text-emerald-400 text-xs font-semibold block uppercase">Soma Total dos Tickets</span>
             <span className="text-xl font-mono font-black text-emerald-400">
-              {formatBRL(totalReceita)}
+              {formatBRL(totalSomaTodosTickets)}
             </span>
           </div>
           <div className="p-2 bg-emerald-600/20 text-emerald-400 rounded-lg">
@@ -116,25 +129,37 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ onSelectEntryForPrint 
 
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
           <div>
-            <span className="text-slate-400 text-xs block">Total de Veículos</span>
+            <span className="text-slate-400 text-xs block">Receita Paga (Baixados)</span>
             <span className="text-xl font-mono font-black text-white">
-              {filteredEntries.length}
+              {formatBRL(totalReceita)}
             </span>
           </div>
           <div className="p-2 bg-blue-600/20 text-blue-400 rounded-lg">
-            <Car className="w-4 h-4" />
+            <DollarSign className="w-4 h-4" />
           </div>
         </div>
 
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
           <div>
-            <span className="text-slate-400 text-xs block">Tickets Concluídos</span>
-            <span className="text-xl font-mono font-black text-blue-400">
-              {filteredEntries.filter(e => e.status === 'pago').length}
+            <span className="text-slate-400 text-xs block">Em Aberto no Pátio</span>
+            <span className="text-xl font-mono font-black text-amber-400">
+              {formatBRL(totalEmAberto)}
             </span>
           </div>
-          <div className="p-2 bg-blue-600/20 text-blue-400 rounded-lg">
-            <FileText className="w-4 h-4" />
+          <div className="p-2 bg-amber-600/20 text-amber-400 rounded-lg">
+            <Clock className="w-4 h-4" />
+          </div>
+        </div>
+
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <span className="text-slate-400 text-xs block">Total de Tickets</span>
+            <span className="text-xl font-mono font-black text-white">
+              {filteredEntries.length}
+            </span>
+          </div>
+          <div className="p-2 bg-purple-600/20 text-purple-400 rounded-lg">
+            <Car className="w-4 h-4" />
           </div>
         </div>
       </div>
@@ -288,7 +313,52 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ onSelectEntryForPrint 
                 })
               )}
             </tbody>
+            {filteredEntries.length > 0 && (
+              <tfoot className="bg-slate-950/95 text-white font-bold border-t-2 border-slate-700 text-xs">
+                <tr>
+                  <td colSpan={6} className="py-4 px-4 text-right uppercase tracking-wider text-slate-300 font-mono">
+                    SOMA TOTAL DE TODOS OS TICKETS ({filteredEntries.length} TICKETS):
+                  </td>
+                  <td className="py-4 px-4 font-mono text-base text-emerald-400 font-black whitespace-nowrap">
+                    {formatBRL(totalSomaTodosTickets)}
+                  </td>
+                  <td colSpan={2} className="py-4 px-4 text-slate-400 text-[11px] font-normal">
+                    {filteredEntries.filter(e => e.status === 'pago').length} pagos / {filteredEntries.filter(e => e.status === 'ativo').length} no pátio
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </table>
+        </div>
+      </div>
+
+      {/* Executive Summary Card at the bottom of the report */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Fechamento do Relatório</span>
+            <h3 className="text-lg font-black text-white">Resumo Geral Financeiro</h3>
+            <p className="text-xs text-slate-400">Totalização consolidada de todos os tickets listados acima</p>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
+              <span className="text-[11px] text-slate-400 font-semibold block">Qtd. Tickets</span>
+              <span className="text-lg font-mono font-black text-white">{filteredEntries.length}</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
+              <span className="text-[11px] text-emerald-400 font-semibold block">Total Já Pago</span>
+              <span className="text-lg font-mono font-black text-emerald-400">{formatBRL(totalReceita)}</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl p-3.5 text-center">
+              <span className="text-[11px] text-amber-400 font-semibold block">Em Aberto (Pátio)</span>
+              <span className="text-lg font-mono font-black text-amber-400">{formatBRL(totalEmAberto)}</span>
+            </div>
+            <div className="bg-emerald-950/60 border border-emerald-500/50 rounded-xl p-3.5 text-center col-span-2 sm:col-span-1 shadow-lg shadow-emerald-950/50">
+              <span className="text-[11px] text-emerald-300 font-black block uppercase tracking-wider">Soma Total Geral</span>
+              <span className="text-xl font-mono font-black text-emerald-400">{formatBRL(totalSomaTodosTickets)}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

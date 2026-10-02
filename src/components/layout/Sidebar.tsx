@@ -139,17 +139,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Relatórios & CSV</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('usuarios')}
-              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                activeTab === 'usuarios'
-                  ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Operadores & Acesso</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('usuarios')}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  activeTab === 'usuarios'
+                    ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Operadores & Acesso</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('auditoria')}

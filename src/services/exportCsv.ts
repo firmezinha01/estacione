@@ -40,7 +40,35 @@ export function exportEntriesToCsv(entries: Entry[], filename = 'relatorio-estad
     `"${e.status.toUpperCase()}"`,
   ]);
 
-  const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\r\n');
+  const totalTarifa = entries.reduce((acc, curr) => acc + (curr.tarifa_calculada || 0), 0);
+  const totalDesconto = entries.reduce((acc, curr) => acc + (curr.valor_desconto || 0), 0);
+  const totalAcrescimo = entries.reduce((acc, curr) => acc + (curr.valor_acrescimo || 0), 0);
+  const totalGeral = entries.reduce(
+    (acc, curr) => acc + (curr.valor_total || curr.tarifa_calculada || curr.payment?.valor || 0),
+    0
+  );
+
+  const totalRow = [
+    '"TOTAL GERAL"',
+    `"${entries.length} tickets"`,
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    '""',
+    `"${formatBRL(totalTarifa)}"`,
+    `"${formatBRL(totalDesconto)}"`,
+    `"${formatBRL(totalAcrescimo)}"`,
+    `"${formatBRL(totalGeral)}"`,
+    '""',
+    '"TOTALIZADO"',
+  ];
+
+  const csvContent =
+    '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';')), totalRow.join(';')].join('\r\n');
   downloadCsvFile(csvContent, filename);
 }
 

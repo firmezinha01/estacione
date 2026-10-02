@@ -91,59 +91,80 @@ export const ParkingProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanUser = email.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // 1. Default Administrator credentials
-    if (cleanEmail === 'admin@estacionamento.com' && cleanPass === 'admin123') {
+    // 1. Administrator credentials: login 'admin' or 'admin@estacionamento.com' with password '123456'
+    if (
+      (cleanUser === 'admin' || cleanUser === 'admin@estacionamento.com') &&
+      cleanPass === '123456'
+    ) {
       const adminUser: User = {
         id: 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380b22',
-        nome: 'Administrador Principal',
-        email: 'admin@estacionamento.com',
+        nome: 'Administrador',
+        email: 'admin',
         role: 'admin',
         ativo: true,
+        senha: '123456',
       };
       storage.setCurrentUser(adminUser);
       storage.setAuthSession(true);
       setCurrentUser(adminUser);
       setIsAuthenticated(true);
-      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: 'admin' });
+      storage.addAuditLog('LOGIN_SUCESSO', { usuario: cleanUser, role: 'admin' });
       return { success: true };
     }
 
     // 2. Default Attendant credentials
-    if (cleanEmail === 'atendente@estacionamento.com' && cleanPass === 'atendente123') {
+    if (
+      (cleanUser === 'atendente' || cleanUser === 'atendente@estacionamento.com') &&
+      (cleanPass === 'atendente123' || cleanPass === '123456')
+    ) {
       const attendantUser: User = {
         id: 'c1eebc99-9c0b-4ef8-bb6d-6bb9bd380c33',
         nome: 'Carlos Atendente',
-        email: 'atendente@estacionamento.com',
+        email: 'atendente',
         role: 'atendente',
         ativo: true,
+        senha: 'atendente123',
       };
       storage.setCurrentUser(attendantUser);
       storage.setAuthSession(true);
       setCurrentUser(attendantUser);
       setIsAuthenticated(true);
-      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: 'atendente' });
+      storage.addAuditLog('LOGIN_SUCESSO', { usuario: cleanUser, role: 'atendente' });
       return { success: true };
     }
 
-    // 3. Registered users in database/localStorage
+    // 3. Registered operators in database / localStorage
     const users = storage.getUsers();
-    const found = users.find(u => u.email.toLowerCase() === cleanEmail);
-    if (found && (cleanPass === 'admin123' || cleanPass === 'atendente123' || cleanPass.length >= 6)) {
-      storage.setCurrentUser(found);
-      storage.setAuthSession(true);
-      setCurrentUser(found);
-      setIsAuthenticated(true);
-      storage.addAuditLog('LOGIN_SUCESSO', { email: cleanEmail, role: found.role });
-      return { success: true };
+    const found = users.find(
+      u =>
+        u.email.toLowerCase() === cleanUser ||
+        u.nome.toLowerCase() === cleanUser ||
+        (cleanUser === 'admin' && u.role === 'admin')
+    );
+
+    if (found && found.ativo !== false) {
+      const isPasswordMatch = found.senha
+        ? found.senha === cleanPass
+        : (found.role === 'admin' && (cleanPass === '123456' || cleanPass === 'admin123')) ||
+          (found.role === 'atendente' && (cleanPass === 'atendente123' || cleanPass === '123456'));
+
+      if (isPasswordMatch) {
+        storage.setCurrentUser(found);
+        storage.setAuthSession(true);
+        setCurrentUser(found);
+        setIsAuthenticated(true);
+        storage.addAuditLog('LOGIN_SUCESSO', { usuario: cleanUser, role: found.role });
+        return { success: true };
+      }
     }
 
-    storage.addAuditLog('LOGIN_FALHA', { email: cleanEmail });
+    storage.addAuditLog('LOGIN_FALHA', { usuario: cleanUser });
     return {
       success: false,
-      message: 'Credenciais inválidas. Utilize os botões de Acesso Rápido para testar.',
+      message: 'Usuário ou senha incorretos. Verifique suas credenciais.',
     };
   };
 

@@ -258,6 +258,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                   <button
                     onClick={() => {
+                      setActiveTab('usuarios');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`p-2 rounded-lg text-xs font-semibold text-left ${
+                      activeTab === 'usuarios' ? 'bg-purple-600 text-white' : 'bg-slate-900 text-slate-300'
+                    }`}
+                  >
+                    👥 Operadores & Acesso
+                  </button>
+                  <button
+                    onClick={() => {
                       setActiveTab('auditoria');
                       setMobileMenuOpen(false);
                     }}

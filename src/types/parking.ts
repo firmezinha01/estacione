@@ -6,6 +6,7 @@ export interface User {
   email: string;
   role: UserRole;
   ativo: boolean;
+  senha?: string;
   created_at?: string;
 }
 
